@@ -1,1 +1,59 @@
+# =========================
+# 👑 C++ build outputs
+# =========================
+# Executables and binaries
+*.exe
+*.dll
+*.obj
+*.o
+*.a
+*.lib
+*.so
+*.out
+*.exp
+*.pdb
+*.idb
+*.ilk
+
+# CMake build folders
+build/
+build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# =========================
+# ⚙️ VS Code settings
+# =========================
 .vscode/
+!.vscode/settings.json        # Giữ settings chung (IntelliSense)
+!.vscode/extensions.json      # Giữ recommendations
+# Nếu project có launch/tasks riêng muốn commit thì bỏ comment:
+# !.vscode/launch.json
+# !.vscode/tasks.json
+
+# =========================
+# 🪟 Windows system files
+# =========================
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# =========================
+# 🧠 Logs & temp
+# =========================
+*.log
+*.tmp
+*.bak
+
+# =========================
+# 🧩 IDE & Editor
+# =========================
+*.user
+*.suo
+*.vcxproj*
+*.code-workspace
+.idea/
+.cache/
