@@ -27,12 +27,7 @@ compile_commands.json
 # =========================
 # ⚙️ VS Code settings
 # =========================
-.vscode/
-!.vscode/settings.json        # Giữ settings chung (IntelliSense)
-!.vscode/extensions.json      # Giữ recommendations
-# Nếu project có launch/tasks riêng muốn commit thì bỏ comment:
-# !.vscode/launch.json
-# !.vscode/tasks.json
+
 
 # =========================
 # 🪟 Windows system files

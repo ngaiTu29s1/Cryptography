@@ -1,0 +1,17 @@
+# Test vectors for cryptographic testing
+# Format: field=value, separated by --- for each test case
+# Fixed fields: plaintext, key, iv (inputs)
+# Expected fields: expected_ciphertext, expected_recovered (for validation)
+
+plaintext=Hello, World!
+key=00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+iv=10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+expected_ciphertext=981098e9592004b557642aff5a
+expected_recovered=Hello, World!
+---
+plaintext=Test Vector 2
+key=AA BB CC DD EE FF 00 11 22 33 44 55 66 77 88 99
+iv=00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF
+expected_ciphertext=asdsad
+expected_recovered=Test Vector 2
+---
