@@ -105,4 +105,3 @@ This implementation is for **educational and research purposes only**. Do not us
 ## 📄 License
 
 This project is for academic use in Cryptography Subject.
-**Let's get A+! 🎯**
