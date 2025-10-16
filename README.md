@@ -1,14 +1,15 @@
 # Sosemanuk Stream Cipher Implementation
 
-A complete implementation of the Sosemanuk stream cipher following the official specification. This project includes proper Serpent S2 S-box, GF(2^32) alpha operations, and key schedule for cryptographic research and educational purposes.
+An educational implementation of the Sosemanuk stream cipher for Cryptography coursework. This project demonstrates core cryptographic concepts including stream ciphers, S-boxes, finite field operations, and key scheduling.
 
-## 🚀 Features
+## 🎓 Educational Features
 
-- ✅ **Serpent S2 S-box** - Correct implementation according to specification
-- ✅ **GF(2^32) Operations** - Proper alpha multiplication/division in finite field
-- ✅ **Key Schedule** - Serpent-based key expansion 
-- ✅ **Test Vectors** - Batch processing with validation
-- ✅ **Cross-platform** - Works on Windows, Linux, macOS
+- ✅ **Stream Cipher Concepts** - LFSR and FSM components
+- ✅ **Serpent S2 S-box** - Uses Serpent's 2nd S-box (not S24!)
+- ✅ **GF(2^32) Operations** - Finite field arithmetic
+- ✅ **Key Schedule** - Serpent-inspired key expansion
+- ✅ **Meaningful Tests** - Crypto properties validation
+- ✅ **Cross-platform** - Windows development environment
 
 ## 📋 Prerequisites
 
@@ -54,38 +55,49 @@ If your GCC is not in `C:/msys64/ucrt64/bin/`, edit `.vscode/tasks.json`:
 
 ```
 Cryptography/
-├── main.cpp                    # Main test program
+├── main.cpp                    # Main demo program (comprehensive testing)
 ├── components/
 │   ├── components.h           # Sosemanuk algorithm header
-│   ├── components.cpp         # Core implementation
+│   ├── components.cpp         # Core implementation  
+│   ├── io_handler.h          # I/O utilities header
 │   └── io_handler.cpp         # Test vector I/O
 ├── test_vectors/
-│   └── test_data.txt         # Test cases
+│   ├── generate_test_vectors.cpp # Test vector generator source
+│   ├── generate_test_vectors.exe # Compiled generator tool
+│   ├── input_example.txt      # Example input format
+│   ├── test_data.txt         # Educational test cases
+│   └── README.md             # Generator usage guide
 ├── .vscode/                  # VS Code configuration
 │   ├── tasks.json           # Build tasks
-│   └── launch.json          # Debug configuration
-└── README.md                # This file
+│   ├── launch.json          # Debug configuration
+│   └── c_cpp_properties.json # IntelliSense settings
+└── README.md                # Documentation
 ```
 
-## 🧪 Test Vectors
+## 🧪 Educational Tests
 
-The project includes test vectors in `test_vectors/test_data.txt`:
+### **Main Demo** (`main.cpp`)
+- ✅ **Complete test vector processing** - Batch testing with multiple vectors
+- ✅ **Encryption/Decryption validation** - Perfect round-trip verification  
+- ✅ **Key/IV/Keystream display** - Full cryptographic workflow demonstration
+- ✅ **Expected vs Actual comparison** - Automatic validation with [OK]/[FAIL] status
+- ✅ **Educational output format** - Clear, readable results for learning
 
-```
-plaintext=Hello Sosemanuk!
-key=0123456789ABCDEF0123456789ABCDEF
-iv=FEDCBA9876543210FEDCBA9876543210
-expected_ciphertext=
-expected_recovered=Hello Sosemanuk!
-```
+The main program provides comprehensive testing that covers all necessary cryptographic validation.
 
 ## 🔬 Algorithm Details
 
 ### Sosemanuk Components
 - **LFSR**: 10 32-bit registers with alpha operations in GF(2^32)
 - **FSM**: 2 32-bit registers with Trans function
-- **S-box**: Serpent S2 for output transformation
+- **S-box**: Serpent S2 (2nd S-box of Serpent, not "S24")
 - **Key Schedule**: Serpent-based expansion to 100 words
+
+### 📝 S-box Clarification
+**Important Note**: Sosemanuk uses **Serpent S2** (the 2nd S-box from Serpent cipher), not "Serpent S24". This is confirmed by the CryptoPP reference implementation. The confusion might arise from:
+- Serpent has 8 S-boxes (S0, S1, S2, S3, S4, S5, S6, S7)
+- Sosemanuk specifically uses the S2 S-box for output transformation
+- "S24" is not a standard Serpent S-box designation
 
 ### GF(2^32) Operations
 - **Polynomial**: x³² + x⁷ + x³ + x² + 1
