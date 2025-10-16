@@ -108,8 +108,15 @@ The main program provides comprehensive testing that covers all necessary crypto
 
 This implementation is for **educational and research purposes only**. Do not use in production systems without proper security audit and validation.
 
-## 📚 References
+## 📚 Tài Liệu Chi Tiết
 
+### 🔬 [docs/](./docs/) - Detailed Documentation
+- **[SOSEMANUK_DETAILED.md](./docs/SOSEMANUK_DETAILED.md)**: Giải thích chi tiết thuật toán bằng tiếng Việt
+- **Toán học**: Linear algebra, Finite fields, LFSR, FSM 
+- **Thuật ngữ**: Giải thích mọi khái niệm cryptography
+- **Ví dụ**: Workflow step-by-step từ key/IV đến keystream
+
+### 📖 References
 - [Sosemanuk Specification](https://cr.yp.to/streamciphers/sosemanuk/desc.pdf)
 - [eSTREAM Project](http://www.ecrypt.eu.org/stream/)
 - [Crypto++ Library](https://www.cryptopp.com/wiki/Sosemanuk)
