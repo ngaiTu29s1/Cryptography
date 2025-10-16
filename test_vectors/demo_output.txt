@@ -1,28 +1,7 @@
 # Test vectors for Sosemanuk implementation
 # Format: field=value, separated by --- for each test case
-# Generated from our educational implementation
+# Auto-generated from input file: input_example.txt
 
-plaintext=Hello, World!
-key=00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF
-iv=88 99 AA BB CC DD EE FF 00 11 22 33 44 55 66 77
-keystream=D3 F6 E3 E7 1F 4B 69 CE ED 25 F2 03 BA
-expected_ciphertext=9B 93 8F 8B 70 67 49 99 82 57 9E 67 9B
-expected_recovered=Hello, World!
----
-plaintext=Test Vector 2
-key=AA BB CC DD EE FF 00 11 22 33 44 55 66 77 88 99
-iv=00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF
-keystream=D1 0C A4 E2 C3 B6 62 84 EB 34 A0 08 FC
-expected_ciphertext=85 69 D7 96 E3 E0 07 E7 9F 5B D2 28 CE
-expected_recovered=Test Vector 2
----
-plaintext=Cryptography Assignment
-key=12 34 56 78 9A BC DE F0 FE DC BA 98 76 54 32 10
-iv=AB CD EF 01 23 45 67 89 9F ED CB A7 65 43 21 0F
-keystream=07 D8 BF E8 86 86 4C E3 73 D7 83 D2 DA DD 94 42 5F 0D C2 AC 0C AA 16
-expected_ciphertext=44 AA C6 98 F2 E9 2B 91 12 A7 EB AB FA 9C E7 31 36 6A AC C1 69 C4 62
-expected_recovered=Cryptography Assignment
----
 plaintext=Hello World
 key=00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF
 iv=FF EE DD CC BB AA 99 88 77 66 55 44 33 22 11 00

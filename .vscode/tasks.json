@@ -42,6 +42,26 @@
         "run: exe (PowerShell)"
       ],
       "problemMatcher": []
-    }
+    },
+    {
+      "label": "build: test vector generator",
+      "type": "shell",
+      "command": "C:/msys64/ucrt64/bin/g++.exe",
+      "args": [
+        "-std=c++17",
+        "test_vectors/generate_test_vectors.cpp",
+        "components/components.cpp",
+        "components/io_handler.cpp",
+        "-I", "C:/msys64/ucrt64/include",
+        "-I", "C:/Users/Tuan Tu Tran/Documents/code/Cryptography/components",
+        "-L", "C:/msys64/ucrt64/lib",
+        "-lcryptopp",
+        "-o", "test_vectors/generate_test_vectors.exe"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$gcc"],
+      "group": "build"
+    },
+
   ]
 }
