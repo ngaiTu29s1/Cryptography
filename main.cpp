@@ -46,13 +46,13 @@ int main(){
             std::cout << "PLAINTEXT : " << tv.plaintext << "\n";
             std::cout << "KEY       : " << tv.key << "\n";
             std::cout << "IV        : " << tv.iv << "\n";
-            std::cout << "KEYSTREAM : " << to_hex(ks.data(), ks.size()) << "\n";
-            std::cout << "CIPHERTEXT: " << to_hex(cipher.data(), cipher.size()) << "\n";
+            std::cout << "KEYSTREAM : " << bytes_to_hex(ks.data(), ks.size()) << "\n";
+            std::cout << "CIPHERTEXT: " << bytes_to_hex(cipher.data(), cipher.size()) << "\n";
             std::cout << "RECOVERED : " << recovered << "\n";
             
             // Check expected values if available and not empty
             if (!tv.expected_ciphertext.empty()) {
-                std::string actual_cipher = to_hex(cipher.data(), cipher.size());
+                std::string actual_cipher = bytes_to_hex(cipher.data(), cipher.size());
                 // Remove spaces for comparison
                 std::string expected_clean = tv.expected_ciphertext;
                 std::string actual_clean = actual_cipher;
