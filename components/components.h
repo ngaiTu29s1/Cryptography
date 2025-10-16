@@ -23,7 +23,7 @@ uint32_t mux(uint32_t c, uint32_t x, uint32_t y);
 uint32_t Trans(uint32_t z);
 uint32_t mul_alpha(uint32_t x);    // GF(2^32) multiplication by alpha
 uint32_t div_alpha(uint32_t x);    // GF(2^32) division by alpha
-void Serpent2_bitslice(const uint32_t in[4], uint32_t out[4]); // Serpent S2 S-box
+void Serpent2_bitslice(const uint32_t in[4], uint32_t out[4]); // Serpent S2 S-box (NOT S24!)
 
 // key schedule and initialization  
 void init_state_from_key_iv(State& st,
