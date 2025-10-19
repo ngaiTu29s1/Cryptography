@@ -398,6 +398,572 @@ def validate_implementation():
 
 ---
 
+## 💻 Code Analysis & Implementation Breakdown
+
+Phần này phân tích chi tiết code trong `components.cpp` để hiểu cách Sosemanuk được implement thực tế.
+
+### 🔧 **1. Constants & Lookup Tables**
+
+```cpp
+// GF(2^32) irreducible polynomial: x^32 + x^7 + x^3 + x^2 + 1
+static constexpr uint32_t GF_POLY = 0x10D;
+static constexpr uint32_t ALPHA_INV = 0x80000069;
+static constexpr uint32_t TRANS_M = 0x54655307u;
+
+// Complete 512-entry lookup table from CryptoPP
+static const uint32_t s_sosemanukMulTables[512] = {
+    // First 256: multiplication table
+    // Last 256: division table  
+    0x00000000, 0xE19FCF12, 0x6B973724, ...
+};
+```
+
+**📝 Phân Tích:**
+- **GF_POLY**: Polynomial bất khả quy để define GF(2³²)
+- **ALPHA_INV**: Nghịch đảo của α = 0x2 trong finite field
+- **TRANS_M**: Hằng số 0x54655307 cho hàm Trans (chọn để tránh weakness)
+- **s_sosemanukMulTables**: Bảng lookup 512 phần tử từ CryptoPP, đảm bảo tính chính xác
+
+**🎯 Tại sao cần lookup tables?**
+- **Performance**: Phép nhân/chia GF(2³²) từ O(32) → O(1)  
+- **Accuracy**: Tránh lỗi implementation polynomial arithmetic
+- **Compatibility**: Đảm bảo kết quả giống CryptoPP reference
+
+---
+
+### ⚙️ **2. Basic Utility Functions**
+
+```cpp
+// Rotation operations (essential for bitwise cryptography)
+uint32_t rol32(uint32_t x, unsigned r){ 
+    return (x<<r) | (x>>(32-r)); 
+}
+
+uint32_t ror32(uint32_t x, unsigned r){ 
+    return (x>>r) | (x<<(32-r)); 
+}
+
+// Multiplexer: conditional selection based on LSB
+uint32_t mux(uint32_t c, uint32_t x, uint32_t y){ 
+    return (c & 1u) ? y : x; 
+}
+```
+
+**📝 Phân Tích:**
+- **rol32/ror32**: Rotate left/right, cần thiết cho key schedule và Trans function
+- **mux**: Chọn `y` nếu bit cuối của `c` = 1, ngược lại chọn `x`
+- **Constant-time**: Các operations này không phụ thuộc vào giá trị data (chống side-channel)
+
+---
+
+### 🧮 **3. GF(2³²) Field Operations**
+
+```cpp
+uint32_t mul_alpha(uint32_t x){
+    // MUL_A macro from CryptoPP
+    return ((x << 8) ^ s_sosemanukMulTables[x >> 24]);
+}
+
+uint32_t div_alpha(uint32_t x){
+    // DIV_A macro from CryptoPP  
+    return ((x >> 8) ^ s_sosemanukMulTables[256 + (x & 0xFF)]);
+}
+```
+
+**📝 Phân Tích Chi Tiết:**
+
+#### **mul_alpha(x) - Nhân với α:**
+```
+Input:  x = [x31 x30 ... x8 x7 ... x0] (32 bits)
+Step 1: x << 8 = [x23 x22 ... x0 0 0 ... 0] (shift left 8 bits)  
+Step 2: x >> 24 = [0 0 ... 0 x31 x30 ... x24] (get top 8 bits)
+Step 3: table[x >> 24] = precomputed reduction value
+Result: (x << 8) XOR table[x >> 24]
+```
+
+**🔍 Tại sao hoạt động?**
+- **Multiplication by α**: Trong GF(2³²), nhân với α = shift left + reduce modulo polynomial
+- **Overflow handling**: Top 8 bits cần reduce bằng polynomial, lookup table làm việc này
+- **Efficiency**: 1 shift + 1 XOR + 1 table lookup = rất nhanh
+
+#### **div_alpha(x) - Chia cho α:**
+```
+Input:  x = [x31 x30 ... x8 x7 ... x0] (32 bits)
+Step 1: x >> 8 = [0 0 ... 0 x31 x30 ... x8] (shift right 8 bits)
+Step 2: x & 0xFF = [0 0 ... 0 x7 x6 ... x0] (get bottom 8 bits)  
+Step 3: table[256 + (x & 0xFF)] = precomputed "carry" value
+Result: (x >> 8) XOR table[256 + (x & 0xFF)]
+```
+
+---
+
+### 🔧 **4. Trans Function (FSM Core)**
+
+```cpp
+uint32_t Trans(uint32_t z){
+    // Trans(z) = (z * 0x54655307) <<< 7 (mod 2^32)
+    uint64_t m = static_cast<uint64_t>(z) * TRANS_M;
+    return rol32(static_cast<uint32_t>(m), 7);
+}
+```
+
+**📝 Phân Tích:**
+- **Purpose**: Non-linear transformation cho FSM state
+- **Algorithm**: Nhân với constant, sau đó rotate left 7 positions
+- **Why uint64_t?**: Tránh overflow khi nhân 32-bit numbers
+- **Constant 0x54655307**: Được chọn để có diffusion properties tốt
+
+**🎲 Tính Chất Cryptographic:**
+- **Avalanche**: Thay đổi 1 bit input → ~16 bit output thay đổi
+- **Period**: Không có fixed points hoặc short cycles
+- **Non-linearity**: Không thể express bằng linear operations
+
+---
+
+### 🐍 **5. Serpent S-box Implementation**
+
+```cpp
+void Serpent2_bitslice(const uint32_t in[4], uint32_t out[4]){
+    uint32_t a = in[0], b = in[1], c = in[2], d = in[3];
+    
+    // Serpent S2 bitslice: process 32 S-boxes in parallel
+    uint32_t t01 = b | c;      // 32 OR operations parallel
+    uint32_t t02 = a | d;
+    uint32_t t03 = a ^ b;      // 32 XOR operations parallel
+    uint32_t t04 = c ^ d;
+    uint32_t t05 = t03 & t04;  // 32 AND operations parallel
+    uint32_t t06 = t01 & t02;
+    out[2] = t05 ^ t06;        // First output
+    
+    // Continue with remaining intermediate values...
+    uint32_t t08 = b ^ d;
+    uint32_t t09 = a | t08;
+    uint32_t t10 = t01 ^ t02;
+    uint32_t t11 = t09 & t10;
+    out[0] = c ^ t11;          // Second output
+    
+    uint32_t t13 = a ^ d;
+    uint32_t t14 = b | out[2];
+    uint32_t t15 = t13 & t14;
+    uint32_t t16 = out[0] | t05;
+    out[1] = t15 ^ t16;        // Third output
+    
+    uint32_t t18 = ~out[1];    // NOT operation
+    uint32_t t19 = t13 ^ t08;
+    uint32_t t20 = t19 & t18;
+    out[3] = t20 ^ out[2];     // Fourth output
+}
+```
+
+**📝 Phân Tích Bitslice Magic:**
+
+#### **Conceptual View:**
+```
+Traditional S-box: 1 input (4 bits) → 1 output (4 bits)
+Bitslice S-box:   32 inputs (4×32 bits) → 32 outputs (4×32 bits)
+
+Input Layout:
+  in[0] = [a31 a30 ... a1 a0] - bit 0 của 32 S-boxes
+  in[1] = [b31 b30 ... b1 b0] - bit 1 của 32 S-boxes  
+  in[2] = [c31 c30 ... c1 c0] - bit 2 của 32 S-boxes
+  in[3] = [d31 d30 ... d1 d0] - bit 3 của 32 S-boxes
+  
+Each S-box i processes: (a_i, b_i, c_i, d_i) → (out0_i, out1_i, out2_i, out3_i)
+```
+
+#### **Performance Advantage:**
+- **Parallel**: 32 S-box transformations trong thời gian của 1
+- **Cache Friendly**: Không cần memory access cho lookup tables
+- **Constant Time**: Execution time không phụ thuộc input values
+
+---
+
+### 🗝️ **6. Key Schedule Analysis**
+
+```cpp
+static void expand_key(const uint8_t* key, size_t keylen, uint32_t w[100]) {
+    // Step 1: Serpent-style padding
+    uint8_t fullkey[32];
+    std::memset(fullkey, 0, 32);
+    std::memcpy(fullkey, key, std::min(keylen, size_t(32)));
+    
+    if (keylen < 32) {
+        fullkey[keylen] = 0x80; // Serpent padding: 1000...
+    }
+    
+    // Step 2: Convert to little-endian 32-bit words
+    uint32_t k[140];
+    for (int i = 0; i < 8; i++) {
+        k[i] = (uint32_t(fullkey[4*i+0]) <<  0) |  // Byte 0 → bits 0-7
+               (uint32_t(fullkey[4*i+1]) <<  8) |  // Byte 1 → bits 8-15
+               (uint32_t(fullkey[4*i+2]) << 16) |  // Byte 2 → bits 16-23
+               (uint32_t(fullkey[4*i+3]) << 24);   // Byte 3 → bits 24-31
+    }
+    
+    // Step 3: Serpent linear recurrence
+    for (int i = 8; i < 140; i++) {
+        uint32_t temp = k[i-8] ^ k[i-5] ^ k[i-3] ^ k[i-1]  // Linear combination
+                        ^ 0x9e3779b9                         // Golden ratio constant
+                        ^ (i-8);                             // Round counter
+        k[i] = rol32(temp, 11);  // Rotate for better diffusion
+    }
+    
+    // Step 4: S-box mixing (non-linear transformation)
+    for (int i = 0; i < 25; i++) { // 100/4 = 25 groups
+        uint32_t a = k[i*4 + 8 + 0], b = k[i*4 + 8 + 1];
+        uint32_t c = k[i*4 + 8 + 2], d = k[i*4 + 8 + 3];
+        
+        serpent_s2_simple(a, b, c, d);  // Apply S2 transformation
+        
+        w[i*4 + 0] = a; w[i*4 + 1] = b;
+        w[i*4 + 2] = c; w[i*4 + 3] = d;
+    }
+}
+```
+
+**📝 Key Schedule Breakdown:**
+
+#### **Step 1 - Padding Strategy:**
+```
+Key 16 bytes: [K0 K1 ... K15] → [K0 K1 ... K15 80 00 00 ... 00]
+Key 24 bytes: [K0 K1 ... K23] → [K0 K1 ... K23 80 00 ... 00]  
+Key 32 bytes: [K0 K1 ... K31] → [K0 K1 ... K31] (no padding)
+```
+**Why 0x80?** Serpent standard: 1 bit followed by zeros để tránh weak keys.
+
+#### **Step 2 - Endianness Handling:**
+```cpp
+// Little-endian conversion example:
+bytes = [0x12, 0x34, 0x56, 0x78]
+word  = 0x78563412  // LSB first trong memory
+```
+
+#### **Step 3 - Linear Recurrence Math:**
+```
+k[i] = ROL11(k[i-8] ⊕ k[i-5] ⊕ k[i-3] ⊕ k[i-1] ⊕ φ ⊕ i)
+
+Where:
+- φ = 0x9e3779b9 = ⌊2³² × (√5-1)/2⌋ (Golden ratio)
+- ROL11 = rotate left 11 positions
+- Taps at positions -8,-5,-3,-1 cho maximum period
+```
+
+#### **Step 4 - S-box Mixing Purpose:**
+- **Break Linearity**: Linear recurrence dễ bị algebraic attacks
+- **Add Confusion**: S-box tạo non-linear relationships
+- **Avalanche**: 1 bit key change → 50% expanded key change
+
+---
+
+### 🎛️ **7. State Initialization Analysis**
+
+```cpp
+void init_state_from_key_iv(State& st, const uint8_t* key, size_t keylen,
+                            const uint8_t* iv, size_t ivlen)
+{
+    // Phase 1: Expand user key
+    uint32_t w[100];
+    expand_key(key, keylen, w);
+    
+    // Phase 2: Process IV  
+    uint32_t iv_words[4] = {0};
+    for (int i = 0; i < 4 && (i*4+3) < (int)ivlen; i++) {
+        iv_words[i] = (uint32_t(iv[4*i+0]) <<  0) |
+                      (uint32_t(iv[4*i+1]) <<  8) |
+                      (uint32_t(iv[4*i+2]) << 16) |
+                      (uint32_t(iv[4*i+3]) << 24);
+    }
+    
+    // Phase 3: Initialize LFSR with key+IV mixing
+    for (int i = 0; i < 10; i++) {
+        st.S[i] = w[i];              // Base from expanded key
+        if (i < 4) {
+            st.S[i] ^= iv_words[i];  // Mix IV into first 4 positions
+        }
+    }
+    
+    // Phase 4: Initialize FSM with key+IV mixing
+    st.R1 = w[10] ^ iv_words[0];     // FSM state from key+IV
+    st.R2 = w[11] ^ iv_words[1];
+    
+    // Phase 5: Warm-up mixing (CRITICAL SECURITY STEP!)
+    for (int round = 0; round < 24; round++) {
+        StepOut dummy = step(st);    // Run cipher but discard output
+        (void)dummy;
+    }
+}
+```
+
+**📝 Initialization Breakdown:**
+
+#### **Phase 3 - LFSR Setup Logic:**
+```
+S[0] = w[0] ⊕ iv_words[0]    // Mix key word 0 với IV word 0
+S[1] = w[1] ⊕ iv_words[1]    // Mix key word 1 với IV word 1  
+S[2] = w[2] ⊕ iv_words[2]    // Mix key word 2 với IV word 2
+S[3] = w[3] ⊕ iv_words[3]    // Mix key word 3 với IV word 3
+S[4] = w[4]                  // Pure key material (no IV)
+S[5] = w[5]                  // Pure key material
+...
+S[9] = w[9]                  // Pure key material
+```
+
+#### **Phase 5 - Warm-up Necessity:**
+**Trước warm-up:** State có structure từ key schedule
+**Sau 24 rounds:** State trở nên pseudorandom, không còn trace của original key+IV
+
+**Mathematical Justification:**
+- **Diffusion Time**: Cần ~20 rounds để 1 bit change lan tỏa toàn bộ state
+- **Safety Margin**: 24 rounds > 20 rounds để đảm bảo complete mixing
+- **Attack Prevention**: Ngăn chặn attacks exploit initial state structure
+
+---
+
+### ⚡ **8. Core Cipher Step Analysis**
+
+```cpp
+StepOut step(State& st){
+    // Save values before state update
+    uint32_t s0 = st.S[0], s3 = st.S[3], s9 = st.S[9];
+    uint32_t R1_old = st.R1, R2_old = st.R2;
+    
+    // FSM Update (Non-linear component)
+    uint32_t choose = mux(R1_old, st.S[1], st.S[1] ^ st.S[8]);
+    uint32_t R1_new = R2_old + choose;          // Addition mod 2^32
+    uint32_t R2_new = Trans(R1_old);            // Non-linear transform  
+    uint32_t f_t = (st.S[9] + R1_new) ^ R2_new; // Output function
+    
+    // LFSR Update (Linear component)
+    uint32_t s10 = s9 ^ div_alpha(s3) ^ mul_alpha(s0);
+    
+    // Shift LFSR registers
+    for(int i=0; i<9; i++) st.S[i] = st.S[i+1];
+    st.S[9] = s10;
+    
+    // Update FSM state
+    st.R1 = R1_new; 
+    st.R2 = R2_new;
+    
+    return { f_t, s0 };  // Return output word + dropped S value
+}
+```
+
+**📝 Step Function Breakdown:**
+
+#### **FSM Logic Analysis:**
+```cpp
+choose = mux(R1_old, st.S[1], st.S[1] ^ st.S[8]);
+```
+**Meaning:** 
+- Nếu `R1_old & 1 == 1`: chọn `S[1] ⊕ S[8]` 
+- Nếu `R1_old & 1 == 0`: chọn `S[1]`
+
+**Why this design?**
+- **Data-dependent**: Selection phụ thuộc vào FSM state
+- **LFSR coupling**: Kết nối FSM với LFSR state
+- **Non-linearity**: Tạo conditional branches
+
+#### **Output Function:**
+```cpp
+uint32_t f_t = (st.S[9] + R1_new) ^ R2_new;
+```
+**Components:**
+- `S[9]`: LFSR contribution (linear)
+- `R1_new`: FSM contribution (non-linear)  
+- `R2_new`: Transformed FSM state (more non-linear)
+- **Combination**: Addition + XOR để balance linear/non-linear
+
+#### **LFSR Feedback:**
+```cpp
+uint32_t s10 = s9 ^ div_alpha(s3) ^ mul_alpha(s0);
+```
+**Mathematical Meaning:**
+```
+S[10] = S[9] ⊕ (S[3]/α) ⊕ (S[0]×α) trong GF(2³²)
+```
+**Taps explanation:**
+- **S[9]**: Direct feedback (immediate history)
+- **S[3]/α**: Delayed feedback với scaling
+- **S[0]×α**: Oldest feedback với scaling
+- **Result**: Maximum period LFSR sequence
+
+---
+
+### 🌊 **9. Keystream Generation Analysis**
+
+```cpp
+void generate_keystream(State& st, uint8_t* out, size_t out_len){
+    size_t produced = 0;
+    uint32_t fbuf[4], sdrop[4];  // Buffers for batching
+    int cnt = 0;
+
+    while(produced < out_len){
+        // Collect cipher step outputs
+        auto o = step(st);
+        fbuf[cnt] = o.f;           // f_t value
+        sdrop[cnt] = o.dropped_s;  // dropped S[0] value
+        cnt++;
+
+        if(cnt == 4){  // Process batch of 4
+            // Prepare input for Serpent S-box (reversed order!)
+            uint32_t in4[4] = { fbuf[3], fbuf[2], fbuf[1], fbuf[0] };
+            uint32_t out4[4];
+            
+            // Apply Serpent S2 bitslice transformation
+            Serpent2_bitslice(in4, out4);
+            
+            // XOR with dropped values and extract bytes
+            for(int i=0; i<4 && produced < out_len; ++i){
+                uint32_t z = out4[i] ^ sdrop[i];  // Final mixing
+                
+                // Extract bytes in little-endian order
+                for(int b=0; b<4 && produced < out_len; ++b){
+                    out[produced++] = static_cast<uint8_t>((z >> (8*b)) & 0xFF);
+                }
+            }
+            cnt = 0;  // Reset batch counter
+        }
+    }
+}
+```
+
+**📝 Keystream Generation Breakdown:**
+
+#### **Batching Strategy:**
+**Why batch 4 f_t values?**
+- **S-box Efficiency**: Serpent S2 thiết kế cho 4×32-bit blocks
+- **Parallelization**: Bitslice xử lý 32 S-boxes simultaneously  
+- **Throughput**: Higher keystream generation rate
+
+#### **Order Reversal Logic:**
+```cpp
+uint32_t in4[4] = { fbuf[3], fbuf[2], fbuf[1], fbuf[0] };
+```
+**Reason:** Sosemanuk specification requires reverse order cho S-box input
+
+#### **Final Mixing:**
+```cpp
+uint32_t z = out4[i] ^ sdrop[i];
+```
+**Purpose:**
+- **Additional Diffusion**: Serpent output XOR với dropped LFSR values
+- **State Dependency**: Keystream phụ thuộc vào both current và past state
+- **Security**: Thêm một layer protection chống cryptanalysis
+
+#### **Byte Extraction:**
+```cpp
+out[produced++] = static_cast<uint8_t>((z >> (8*b)) & 0xFF);
+```
+**Little-endian order:**
+- Byte 0: bits 0-7 (LSB first)
+- Byte 1: bits 8-15
+- Byte 2: bits 16-23  
+- Byte 3: bits 24-31 (MSB last)
+
+---
+
+### 🔗 **10. Integration & Dependencies**
+
+#### **Function Call Flow:**
+```
+main() 
+  ↓
+init_state_from_key_iv()
+  ├── expand_key()           // Key schedule
+  │   └── serpent_s2_simple()
+  ├── IV processing
+  └── 24× step()             // Warm-up
+      ├── mux()
+      ├── Trans()
+      ├── mul_alpha() / div_alpha()
+      └── LFSR shift
+  ↓
+generate_keystream()
+  └── step() batches
+      └── Serpent2_bitslice()
+  ↓
+XOR với plaintext = ciphertext
+```
+
+#### **Data Flow Dependencies:**
+```
+User Key → expand_key() → w[100] words
+User IV → little-endian → iv_words[4]  
+Key+IV → LFSR state S[10] + FSM state R1,R2
+State → step() → f_t values + dropped S values
+Batched f_t → Serpent S-box → keystream bytes
+```
+
+#### **Memory Layout:**
+```cpp
+State struct:
+  S[10]:    10 × 32-bit = 320 bits (LFSR)
+  R1, R2:    2 × 32-bit =  64 bits (FSM)
+  Total:                 = 384 bits internal state
+
+Lookup Tables:
+  s_sosemanukMulTables: 512 × 32-bit = 2KB (read-only)
+```
+
+---
+
+### ✅ **11. Code Quality & Security Features**
+
+#### **Memory Safety:**
+```cpp
+// Bounds checking
+for (int i = 0; i < 4 && (i*4+3) < (int)ivlen; i++) { ... }
+
+// Safe type casting  
+static_cast<uint8_t>((z >> (8*b)) & 0xFF)
+
+// Buffer management
+std::memset(fullkey, 0, 32);
+std::memcpy(fullkey, key, std::min(keylen, size_t(32)));
+```
+
+#### **Constant-Time Operations:**
+```cpp
+// No data-dependent branches in crypto core
+uint32_t mux(uint32_t c, uint32_t x, uint32_t y){ 
+    return (c & 1u) ? y : x;  // Branch on LSB only
+}
+
+// Bitslice S-box: no table lookups
+Serpent2_bitslice() // Pure Boolean operations
+```
+
+#### **Compatibility Features:**
+```cpp
+// CryptoPP-compatible lookup tables
+static const uint32_t s_sosemanukMulTables[512] = { ... };
+
+// Standard endianness handling
+uint32_t word = (byte0 << 0) | (byte1 << 8) | (byte2 << 16) | (byte3 << 24);
+```
+
+---
+
+### 🎯 **12. Performance Optimizations**
+
+#### **Algorithmic Optimizations:**
+- **Lookup Tables**: GF(2³²) operations in O(1) time
+- **Bitslice S-box**: 32× parallelization  
+- **Batched Processing**: Amortize function call overhead
+- **Minimal Branching**: Reduce pipeline stalls
+
+#### **Memory Optimizations:**
+- **Static Tables**: Lookup tables in read-only memory
+- **Local Variables**: Keep frequently used data in registers
+- **Sequential Access**: Good cache locality
+
+#### **Implementation Optimizations:**
+- **Inline Functions**: Reduce call overhead for small functions
+- **Compile-time Constants**: constexpr for compile-time evaluation
+- **Type Safety**: Proper type casting to avoid undefined behavior
+
+---
+
 ## Tổng Quan
 
 **Sosemanuk** là một **stream cipher** (mã hóa dòng) được thiết kế bởi nhóm nghiên cứu Pháp năm 2005. Đây là một trong 4 cipher được chọn vào Portfolio cuối cùng của dự án eSTREAM.
