@@ -1,0 +1,39 @@
+# Test vectors for Sosemanuk implementation
+# Format: field=value, separated by --- for each test case
+# Auto-generated from input file: input_example.txt
+
+plaintext=Hello World
+key=00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF
+iv=FF EE DD CC BB AA 99 88 77 66 55 44 33 22 11 00
+keystream=9D C7 5A C6 B5 C9 66 0A E7 B0 7C
+expected_ciphertext=D5 A2 36 AA DA E9 31 65 95 DC 18
+expected_recovered=Hello World
+---
+plaintext=Security Test
+key=12 34 56 78 9A BC DE F0 FE DC BA 98 76 54 32 10
+iv=01 23 45 67 89 AB CD EF EF CD AB 89 67 45 23 01
+keystream=DC 0F 7A 15 E1 7C 4B DE AA 36 3E CC 78
+expected_ciphertext=8F 6A 19 60 93 15 3F A7 8A 62 5B BF 0C
+expected_recovered=Security Test
+---
+plaintext=Cryptography
+key=AA BB CC DD EE FF 00 11 22 33 44 55 66 77 88 99
+iv=99 88 77 66 55 44 33 22 11 00 FF EE DD CC BB AA
+keystream=86 97 AD 66 D4 FA B7 E6 1B 6C 55 52
+expected_ciphertext=C5 E5 D4 16 A0 95 D0 94 7A 1C 3D 2B
+expected_recovered=Cryptography
+---
+plaintext=Short
+key=FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+iv=00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+keystream=91 40 59 9C 77
+expected_ciphertext=C2 28 36 EE 03
+expected_recovered=Short
+---
+plaintext=Long message for testing purposes
+key=A1 B2 C3 D4 E5 F6 07 18 29 3A 4B 5C 6D 7E 8F 90
+iv=90 8F 7E 6D 5C 4B 3A 29 18 07 F6 E5 D4 C3 B2 A1
+keystream=0A 5C 2A 57 F6 1A DE 36 53 8B 36 EE 66 82 1F 28 1B 2F 0B A0 B3 D6 E8 1E 6B 2A 03 F3 AA 2A 77 14 B5
+expected_ciphertext=46 33 44 30 D6 77 BB 45 20 EA 51 8B 46 E4 70 5A 3B 5B 6E D3 C7 BF 86 79 4B 5A 76 81 DA 45 04 71 C6
+expected_recovered=Long message for testing purposes
+---
