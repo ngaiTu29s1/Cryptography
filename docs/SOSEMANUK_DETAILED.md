@@ -2,14 +2,399 @@
 
 ## 📋 Mục Lục
 1. [Tổng Quan](#tổng-quan)
-2. [Kiến Trúc Tổng Thể](#kiến-trúc-tổng-thể)
-3. [Linear Feedback Shift Register (LFSR)](#linear-feedback-shift-register-lfsr)
-4. [Finite State Machine (FSM)](#finite-state-machine-fsm)
-5. [Serpent S-box](#serpent-s-box)
-6. [Finite Field GF(2³²)](#finite-field-gf2³²)
-7. [Key Schedule](#key-schedule)
-8. [Quá Trình Tạo Keystream](#quá-trình-tạo-keystream)
-9. [Ví Dụ Thực Tế](#ví-dụ-thực-tế)
+2. [🔄 Workflow Hoàn Toàn - Hướng Dẫn Thực Hiện](#🔄-workflow-hoàn-toàn---hướng-dẫn-thực-hiện)
+3. [Kiến Trúc Tổng Thể](#kiến-trúc-tổng-thể)
+4. [Linear Feedback Shift Register (LFSR)](#linear-feedback-shift-register-lfsr)
+5. [Finite State Machine (FSM)](#finite-state-machine-fsm)
+6. [Serpent S-box](#serpent-s-box)
+7. [Finite Field GF(2³²)](#finite-field-gf2³²)
+8. [Key Schedule](#key-schedule)
+9. [Quá Trình Tạo Keystream](#quá-trình-tạo-keystream)
+10. [Ví Dụ Thực Tế](#ví-dụ-thực-tế)
+
+---
+
+## 🔄 Workflow Hoàn Toàn - Hướng Dẫn Thực Hiện
+
+### 📌 Tóm Tắt Quy Trình Chính
+
+Đây là **quy trình hoàn chỉnh** để mã hóa/giải mã với Sosemanuk. Đọc phần này trước để hiểu toàn bộ luồng hoạt động:
+
+```
+INPUT: Plaintext + Key(128-256bit) + IV(128bit)
+   ↓
+PHASE 1: KEY SCHEDULE (Serpent-based)
+   ├── Key Padding (nếu cần)
+   ├── Linear Recurrence (Golden Ratio)  
+   ├── S-box Mixing (Serpent S2)
+   └── → Expanded Key (100 words)
+   ↓
+PHASE 2: STATE INITIALIZATION
+   ├── LFSR Setup (S[0-9] ← Key ⊕ IV)
+   ├── FSM Setup (R1,R2 ← Key ⊕ IV)
+   └── Warm-up (24 rounds discard)
+   ↓
+PHASE 3: KEYSTREAM GENERATION (Loop)
+   ├── LFSR Step: S[i] → S[i+1], compute feedback
+   ├── FSM Step: Update R1,R2, generate f_t
+   ├── Collect 4 f_t values → Buffer
+   ├── Apply Serpent S2 Bitslice
+   ├── XOR with dropped S values
+   └── → 16 bytes keystream
+   ↓
+PHASE 4: ENCRYPTION/DECRYPTION
+   └── Plaintext ⊕ Keystream = Ciphertext
+```
+
+### 🎯 Checklist Cho Collaborators
+
+**Trước khi bắt đầu implement, hãy đảm bảo hiểu:**
+
+#### ✅ Toán Học Cơ Bản Cần Biết
+- [ ] **GF(2³²) Operations**: Phép cộng = XOR, phép nhân với α qua lookup table
+- [ ] **LFSR Feedback**: `S[10] = S[9] ⊕ div_alpha(S[3]) ⊕ mul_alpha(S[0])`
+- [ ] **FSM Update**: Hàm MUX, Trans, cách cập nhật R1/R2
+- [ ] **Serpent S2**: Bitslice processing, xử lý 32 S-box song song
+- [ ] **Key Schedule**: Serpent-style expansion với S-box mixing
+
+#### ✅ Implementation Points
+- [ ] **Endianness**: Little-endian cho conversion bytes ↔ words
+- [ ] **Lookup Tables**: s_sosemanukMulTables[512] từ CryptoPP
+- [ ] **Warm-up Rounds**: 24 rounds để trộn đều state
+- [ ] **Buffer Management**: Thu thập 4 f_t values trước khi S-box
+- [ ] **Memory Safety**: Bounds checking cho arrays
+
+#### ✅ Testing & Validation  
+- [ ] **Test Vectors**: So sánh với reference implementation
+- [ ] **Edge Cases**: Key lengths khác nhau, IV all-zero
+- [ ] **Performance**: Đo tốc độ keystream generation
+- [ ] **Memory**: Check leaks và buffer overflows
+
+---
+
+### 🔢 Workflow Chi Tiết - Từng Bước Cụ Thể
+
+#### **BƯỚC 1: Chuẩn Bị Input**
+
+```python
+def prepare_inputs():
+    # Input validation
+    assert 16 <= len(key) <= 32, "Key must be 16-32 bytes"
+    assert len(iv) == 16, "IV must be exactly 16 bytes"
+    
+    # Convert to internal format
+    key_bytes = pad_key_if_needed(key)  # Serpent padding if < 32 bytes
+    iv_words = bytes_to_words_little_endian(iv)  # 4 words
+    
+    return key_bytes, iv_words
+```
+
+**⚠️ Lưu ý quan trọng:**
+- Key có thể 16, 24, hoặc 32 bytes
+- IV luôn luôn phải 16 bytes (128 bits)
+- Endianness: Little-endian cho tất cả conversions
+
+---
+
+#### **BƯỚC 2: Key Schedule (Serpent-based)**
+
+```python
+def serpent_key_schedule(key_bytes):
+    """
+    Mở rộng user key thành 100 words cho Sosemanuk
+    Dựa trên Serpent key schedule với một số modifications
+    """
+    
+    # Phase 2.1: Padding key to 32 bytes
+    fullkey = pad_to_32_bytes(key_bytes)  # Serpent padding: 0x80, then zeros
+    
+    # Phase 2.2: Convert to words + Linear expansion
+    k = bytes_to_words(fullkey)  # 8 words
+    
+    # Phase 2.3: Linear recurrence (Serpent style)
+    for i in range(8, 140):  # Generate 140 prekeys
+        temp = k[i-8] ^ k[i-5] ^ k[i-3] ^ k[i-1] ^ GOLDEN_RATIO ^ (i-8)
+        k[i] = rotate_left(temp, 11)
+    
+    # Phase 2.4: S-box mixing (groups of 4)
+    for group in range(25):  # 100/4 = 25 groups
+        serpent_s2_transform(k[8 + group*4 : 8 + group*4 + 4])
+    
+    return k[8:108]  # Return 100 words for Sosemanuk
+```
+
+**🔍 Tại sao cần Key Schedule phức tạp?**
+1. **Avalanche Effect**: 1 bit key thay đổi → 50% expanded key thay đổi
+2. **Non-linearity**: S-box phá vỡ tính tuyến tính
+3. **Uniform Distribution**: Mọi expanded key đều có xác suất xuất hiện bằng nhau
+
+---
+
+#### **BƯỚC 3: State Initialization**
+
+```python
+def initialize_cipher_state(expanded_key, iv_words):
+    """
+    Khởi tạo internal state từ expanded key và IV
+    """
+    
+    # Phase 3.1: Setup LFSR (10 registers × 32-bit)
+    S = [0] * 10
+    for i in range(10):
+        S[i] = expanded_key[i]
+        if i < 4:  # Mix IV into first 4 registers
+            S[i] ^= iv_words[i]
+    
+    # Phase 3.2: Setup FSM (2 registers × 32-bit)
+    R1 = expanded_key[10] ^ iv_words[0]  # Mix with IV
+    R2 = expanded_key[11] ^ iv_words[1]
+    
+    # Phase 3.3: Warm-up mixing (CRITICAL!)
+    for round_num in range(24):
+        _, _ = cipher_step(S, R1, R2)  # Discard outputs
+    
+    return S, R1, R2
+```
+
+**🔥 Tại sao cần 24 rounds warm-up?**
+- **Diffusion**: Đảm bảo key+IV khuếch tán đều khắp state
+- **Pattern Breaking**: Xóa các patterns có thể dự đoán được
+- **Security**: Ngăn chặn attacks dựa trên initial state
+
+---
+
+#### **BƯỚC 4: Cipher Step Function (Trái Tim Của Thuật Toán)**
+
+```python
+def cipher_step(S, R1, R2):
+    """
+    Một bước của Sosemanuk cipher
+    Input: LFSR state S[10], FSM registers R1,R2
+    Output: keystream word f_t, dropped S value
+    """
+    
+    # Phase 4.1: Save values needed for output
+    s0_old = S[0]  # Will be dropped/shifted out
+    s3_val = S[3]  # For LFSR feedback  
+    s9_val = S[9]  # For FSM input
+    
+    # Phase 4.2: FSM Update (Non-linear part)
+    choose = MUX(R1, S[1], S[1] ^ S[8])  # Conditional selection
+    R1_new = R2 + choose                  # Addition (mod 2^32)
+    R2_new = Trans(R1)                    # Non-linear transformation
+    f_t = (s9_val + R1_new) ^ R2_new      # Output function
+    
+    # Phase 4.3: LFSR Update (Linear part)  
+    s10_new = s9_val ^ div_alpha(s3_val) ^ mul_alpha(s0_old)
+    
+    # Shift LFSR: S[0] ← S[1] ← S[2] ← ... ← S[9] ← s10_new
+    for i in range(9):
+        S[i] = S[i+1]
+    S[9] = s10_new
+    
+    # Phase 4.4: Update FSM state
+    R1, R2 = R1_new, R2_new
+    
+    return f_t, s0_old
+```
+
+**🧠 Hiểu sâu Cipher Step:**
+- **LFSR**: Tạo tính chu kỳ dài, dễ dự đoán nếu đứng một mình
+- **FSM**: Thêm tính phi tuyến, làm khó dự đoán
+- **Kết hợp**: LFSR + FSM = vừa có chu kỳ dài, vừa khó phân tích
+
+---
+
+#### **BƯỚC 5: Keystream Generation (Batched Processing)**
+
+```python
+def generate_keystream_batch(S, R1, R2, length_needed):
+    """
+    Tạo keystream theo batch 16-byte (128-bit)
+    Sosemanuk xử lý 4 f_t values cùng lúc qua Serpent S-box
+    """
+    
+    keystream = []
+    
+    while len(keystream) < length_needed:
+        # Phase 5.1: Collect 4 cipher steps
+        f_values = []
+        s_dropped = []
+        
+        for _ in range(4):
+            f_t, s_old = cipher_step(S, R1, R2)
+            f_values.append(f_t)
+            s_dropped.append(s_old)
+        
+        # Phase 5.2: Arrange for Serpent bitslice (reverse order!)
+        serpent_input = [f_values[3], f_values[2], f_values[1], f_values[0]]
+        
+        # Phase 5.3: Apply Serpent S2 bitslice  
+        serpent_output = serpent_s2_bitslice(serpent_input)
+        
+        # Phase 5.4: Final XOR and byte extraction
+        for i in range(4):
+            final_word = serpent_output[i] ^ s_dropped[i]
+            keystream.extend(word_to_bytes_little_endian(final_word))
+    
+    return keystream[:length_needed]
+```
+
+**🎲 Tại sao lại batch 4 values?**
+- **Serpent Compatibility**: Serpent S-box thiết kế cho 4×32-bit blocks
+- **Parallel Processing**: Bitslice cho phép xử lý 32 S-box cùng lúc
+- **Efficiency**: Giảm overhead function calls
+
+---
+
+#### **BƯỚC 6: Encryption/Decryption (Stream Cipher)**
+
+```python
+def sosemanuk_encrypt_decrypt(plaintext, key, iv):
+    """
+    Mã hóa/giải mã với Sosemanuk
+    Lưu ý: Stream cipher → encrypt = decrypt (symmetric)
+    """
+    
+    # Phase 6.1: Setup
+    expanded_key = serpent_key_schedule(key)
+    iv_words = bytes_to_words_little_endian(iv)
+    S, R1, R2 = initialize_cipher_state(expanded_key, iv_words)
+    
+    # Phase 6.2: Generate keystream
+    keystream = generate_keystream_batch(S, R1, R2, len(plaintext))
+    
+    # Phase 6.3: XOR encryption/decryption
+    ciphertext = []
+    for i in range(len(plaintext)):
+        ciphertext.append(plaintext[i] ^ keystream[i])
+    
+    return bytes(ciphertext)
+```
+
+---
+
+### 🔬 Điểm Mấu Chốt Cần Hiểu Sâu
+
+#### **1. Finite Field GF(2³²) Operations**
+
+```python
+# Phép cộng trong GF(2^32): Đơn giản là XOR
+def gf_add(a, b):
+    return a ^ b
+
+# Phép nhân với α: Sử dụng lookup table để tối ưu
+def gf_mul_alpha(x):
+    return ((x << 8) ^ MULTIPLICATION_TABLE[x >> 24]) & 0xFFFFFFFF
+
+# Phép chia cho α: Cũng dùng lookup table  
+def gf_div_alpha(x):
+    return ((x >> 8) ^ DIVISION_TABLE[x & 0xFF]) & 0xFFFFFFFF
+```
+
+**💡 Tại sao cần Finite Field?**
+- **Tính Toán Chính Xác**: Đảm bảo operations không overflow
+- **Tính Chất Đại Số**: LFSR feedback có tính chất toán học tốt
+- **Bảo Mật**: Khó dự đoán quan hệ input-output
+
+#### **2. Serpent S2 Bitslice Magic**
+
+```python
+def serpent_s2_bitslice_explained(in_words):
+    """
+    Serpent S2 xử lý 32 S-box song song
+    Mỗi bit position = 1 S-box 4→4 bit
+    """
+    
+    # Input: 4 words = 4×32 bits = 128 bits total
+    # Tưởng tượng: 32 S-box, mỗi cái nhận 4 bits từ 4 words
+    
+    a, b, c, d = in_words[0], in_words[1], in_words[2], in_words[3]
+    
+    # Bitslice operations (Boolean logic on 32 bits parallel)
+    t01 = b | c          # 32 OR operations song song
+    t02 = a | d
+    t03 = a ^ b          # 32 XOR operations song song  
+    # ... (phức tạp hơn nhưng ý tưởng giống)
+    
+    return [out_a, out_b, out_c, out_d]
+```
+
+**🚀 Lợi ích Bitslice:**
+- **Tốc độ**: 32 S-box trong thời gian của 1 S-box
+- **Cache Friendly**: Ít memory access hơn table lookup
+- **Constant Time**: Không phụ thuộc input data (chống side-channel)
+
+#### **3. Key Schedule Security Properties**
+
+```python
+# Avalanche Test
+def test_avalanche_effect():
+    key1 = [0x00] * 16
+    key2 = [0x01] + [0x00] * 15  # Chỉ khác 1 bit
+    
+    expanded1 = serpent_key_schedule(key1)
+    expanded2 = serpent_key_schedule(key2)
+    
+    diff_bits = count_different_bits(expanded1, expanded2)
+    avalanche_ratio = diff_bits / (100 * 32)  # Should be ≈ 0.5
+    
+    assert 0.4 < avalanche_ratio < 0.6, "Poor avalanche effect!"
+```
+
+---
+
+### 🎯 Troubleshooting Guide
+
+#### **Lỗi Thường Gặp & Cách Fix:**
+
+1. **Wrong Keystream Output**:
+   - ✅ Check endianness (little-endian)
+   - ✅ Verify lookup tables (s_sosemanukMulTables)
+   - ✅ Confirm 24 warm-up rounds
+   - ✅ Check Serpent S2 implementation
+
+2. **Performance Issues**:
+   - ✅ Use lookup tables thay vì compute GF operations
+   - ✅ Implement Serpent bitslice correctly
+   - ✅ Avoid unnecessary memory allocations
+
+3. **Security Concerns**:
+   - ✅ Never reuse IV with same key
+   - ✅ Ensure random IV generation
+   - ✅ Implement constant-time operations nếu cần
+
+#### **Validation Steps:**
+
+```python
+def validate_implementation():
+    # Test với known test vectors
+    test_key = bytes.fromhex("00112233445566778899aabbccddeeff")
+    test_iv = bytes.fromhex("ffeeddccbbaa99887766554433221100")
+    test_plain = b"Hello, Sosemanuk!"
+    
+    # Expected ciphertext (from reference implementation)
+    expected = bytes.fromhex("...")  # Điền từ test vectors
+    
+    actual = sosemanuk_encrypt_decrypt(test_plain, test_key, test_iv)
+    assert actual == expected, "Implementation mismatch!"
+```
+
+---
+
+### 🏆 Tóm Tắt Workflow Cho Team
+
+**Khi implement, hãy làm theo thứ tự:**
+
+1. **Setup Constants**: Lookup tables, hằng số GF(2³²)
+2. **Basic Operations**: GF operations, bitwise utilities  
+3. **Serpent Components**: S2 bitslice, key schedule
+4. **LFSR & FSM**: Step function, state management
+5. **Integration**: Initialization, keystream generation
+6. **Testing**: Test vectors, edge cases, performance
+7. **Documentation**: Code comments, usage examples
+
+**Mỗi component nên được test riêng biệt trước khi integrate!**
 
 ---
 
