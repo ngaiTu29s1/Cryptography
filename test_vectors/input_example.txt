@@ -1,0 +1,9 @@
+# Input file for test vector generation
+# Format: plaintext|key|iv
+# Lines starting with # are comments
+
+Hello World|00 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF|FF EE DD CC BB AA 99 88 77 66 55 44 33 22 11 00
+Security Test|12 34 56 78 9A BC DE F0 FE DC BA 98 76 54 32 10|01 23 45 67 89 AB CD EF EF CD AB 89 67 45 23 01
+Cryptography|AA BB CC DD EE FF 00 11 22 33 44 55 66 77 88 99|99 88 77 66 55 44 33 22 11 00 FF EE DD CC BB AA
+Short|FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF|00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+Long message for testing purposes|A1 B2 C3 D4 E5 F6 07 18 29 3A 4B 5C 6D 7E 8F 90|90 8F 7E 6D 5C 4B 3A 29 18 07 F6 E5 D4 C3 B2 A1
