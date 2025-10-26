@@ -5,6 +5,7 @@ SOURCES=./sosemanuk_sources
 MAIN_OBJS=sosemanuk.o main.o
 BIGTEST_OBJS=sosemanuk.o bigtest.o
 TEST_VECTORS_OBJS=sosemanuk.o testvectors.o
+SIMPLE_OBJS=sosemanuk.o simple_sosemanuk.o
 
 MAIN_DEVELOPER_OBJS=$(patsubst %, $(SOURCES)/%, ecrypt-sync.o sosemanuk.o main.o)
 BIGTEST_DEVELOPER_OBJS=$(patsubst %, $(SOURCES)/%, ecrypt-sync.o sosemanuk.o bigtest_2.o)
@@ -12,11 +13,12 @@ BIGTEST_DEVELOPER_OBJS=$(patsubst %, $(SOURCES)/%, ecrypt-sync.o sosemanuk.o big
 MAIN=main
 BIGTEST=bigtest
 TEST_VECTORS=testvectors
+SIMPLE=simple_sosemanuk
 
 MAIN_DEVELOPER=$(SOURCES)/main
 BIGTEST_DEVELOPER=$(SOURCES)/bigtest_2
 
-all: $(MAIN) $(BIGTEST) $(TEST_VECTORS) $(MAIN_DEVELOPER) $(BIGTEST_DEVELOPER)
+all: $(MAIN) $(BIGTEST) $(TEST_VECTORS) $(SIMPLE) $(MAIN_DEVELOPER) $(BIGTEST_DEVELOPER)
 
 .c.o:
 	$(CC) $(CFLAGS) -c $^ -o $@
@@ -36,9 +38,12 @@ $(BIGTEST_DEVELOPER): $(BIGTEST_DEVELOPER_OBJS)
 $(TEST_VECTORS): $(TEST_VECTORS_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^
 
+$(SIMPLE): $(SIMPLE_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^
+
 clean:
 	rm -f *.o $(SOURCES)/*.o
-	rm -f $(MAIN) $(BIGTEST) $(MAIN_DEVELOPER) $(BIGTEST_DEVELOPER)
+	rm -f $(MAIN) $(BIGTEST) $(TEST_VECTORS) $(SIMPLE) $(MAIN_DEVELOPER) $(BIGTEST_DEVELOPER)
 
 .PHONY: test
 test:
