@@ -8,14 +8,9 @@
 
 #include "sosemanuk.h"
 
-#define BUFLEN	10000000
-
 // Struct for time value
 struct timeval t1, t2;
 
-uint8_t buf[BUFLEN];
-uint8_t out1[BUFLEN];
-uint8_t out2[BUFLEN];
 uint8_t key[32];
 uint8_t iv[16];
 
@@ -44,14 +39,6 @@ time_stop(void)
 void hex_to_bytes(const char *hex, uint8_t *bytes, size_t len) {
     for (size_t i = 0; i < len; i++) {
         sscanf(hex + 2 * i, "%2hhx", &bytes[i]);
-    }
-}
-
-void reverse_bytes(uint8_t *data, size_t len) {
-    for (size_t i = 0; i < len / 2; i++) {
-        uint8_t temp = data[i];
-        data[i] = data[len - 1 - i];
-        data[len - 1 - i] = temp;
     }
 }
 
