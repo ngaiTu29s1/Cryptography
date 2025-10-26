@@ -42,7 +42,7 @@ main(void)
     uint8_t plaintext[16] = "Hello World!";  // 12 bytes + padding
     plaintext[12] = 0x00; plaintext[13] = 0x00; plaintext[14] = 0x00; plaintext[15] = 0x00;
 
-    FILE *fp_txt, *fp_json;
+    FILE *fp_txt;
     char key_hex[65], plaintext_hex[33];
     int i;
 
@@ -52,13 +52,7 @@ main(void)
 
     // Open files
     remove("test_vector.txt");
-    remove("test_vector.json");
     fp_txt = fopen("test_vector.txt", "w");
-    fp_json = fopen("test_vector.json", "w");
-
-    if (fp_json) {
-        fprintf(fp_json, "{\n  \"test_vectors\": [\n");
-    }
 
     // Generate 20 test vectors with incrementing IV
     for (i = 0; i < 20; i++) {
@@ -106,28 +100,11 @@ main(void)
             fprintf(fp_txt, "Ciphertext: %s\n", ciphertext_hex);
             fprintf(fp_txt, "Recovered Plaintext: %s\n\n", recovered_hex);
         }
-
-        // Write to JSON
-        if (fp_json) {
-            if (i > 0) fprintf(fp_json, ",\n");
-            fprintf(fp_json, "    {\n");
-            fprintf(fp_json, "      \"key\": \"%s\",\n", key_hex);
-            fprintf(fp_json, "      \"iv\": \"%s\",\n", iv_hex);
-            fprintf(fp_json, "      \"keystream_expected\": \"%s\",\n", keystream_hex);
-            fprintf(fp_json, "      \"plaintext\": \"%s\",\n", plaintext_hex);
-            fprintf(fp_json, "      \"ciphertext_expected\": \"%s\",\n", ciphertext_hex);
-            fprintf(fp_json, "      \"recovered_plaintext_expected\": \"%s\"\n", recovered_hex);
-            fprintf(fp_json, "    }");
-        }
     }
 
-    if (fp_json) {
-        fprintf(fp_json, "\n  ]\n}\n");
-        fclose(fp_json);
-    }
     if (fp_txt) fclose(fp_txt);
 
-    printf("Generated 20 test vectors to test_vector.txt and test_vector.json\n");
+    printf("Generated 20 test vectors to test_vector.txt\n");
 
     return 0;
 }
