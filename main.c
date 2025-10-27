@@ -90,11 +90,10 @@ main()
 
 			// Read Plaintext
 			fgets(line, sizeof(line), fp);
-			char pt_hex[33];
-			sscanf(line, "Plaintext: %32s", pt_hex);
+			char pt_text[17];
+			sscanf(line, "Plaintext: %16[^\n]", pt_text);
 			uint8_t plaintext[16];
-			hex_to_bytes(pt_hex, plaintext, 16);
-			printf("Plaintext (hex): %s\n", pt_hex);
+			memcpy(plaintext, pt_text, 16);
 			printf("Plaintext (text): %.*s\n", 16, plaintext);
 
 			// Read Ciphertext expected
@@ -104,7 +103,6 @@ main()
 			uint8_t ct_expected[16];
 			hex_to_bytes(ct_hex, ct_expected, 16);
 			printf("Ciphertext Expected (hex): %s\n", ct_hex);
-			printf("Ciphertext Expected (text): %.*s\n", 16, ct_expected);
 
 			// Skip Recovered
 			fgets(line, sizeof(line), fp);
@@ -133,7 +131,6 @@ main()
 			char computed_hex[33];
 			bytes_to_hex(ciphertext, 16, computed_hex);
 			printf("Ciphertext Computed (hex): %s\n", computed_hex);
-			printf("Ciphertext Computed (text): %.*s\n", 16, ciphertext);
 
 			// Compare ciphertext
 			int cipher_passed = (memcmp(ciphertext, ct_expected, 16) == 0);
@@ -149,11 +146,10 @@ main()
 			for (int j = 0; j < 16; j++) {
 				recovered[j] = ciphertext[j] ^ keystream_bytes[j];
 			}
-			char recovered_hex[33];
-			bytes_to_hex(recovered, 16, recovered_hex);
-			printf("Recovered Plaintext Expected (hex): %s\n", pt_hex);
+			// char recovered_hex[33];
+			// bytes_to_hex(recovered, 16, recovered_hex);
 			printf("Recovered Plaintext Expected (text): %.*s\n", 16, plaintext);
-			printf("Recovered Plaintext Computed (hex): %s\n", recovered_hex);
+			// printf("Recovered Plaintext Computed (hex): %s\n", recovered_hex);
 			printf("Recovered Plaintext Computed (text): %.*s\n", 16, recovered);
 
 			// Compare recovered

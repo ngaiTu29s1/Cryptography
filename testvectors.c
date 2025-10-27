@@ -43,12 +43,12 @@ main(void)
     plaintext[12] = 0x00; plaintext[13] = 0x00; plaintext[14] = 0x00; plaintext[15] = 0x00;
 
     FILE *fp_txt;
-    char key_hex[65], plaintext_hex[33];
+    char key_hex[65];
     int i;
 
     // Convert key and plaintext to hex
     bytes_to_hex(key, 32, key_hex);
-    bytes_to_hex(plaintext, 16, plaintext_hex);
+    // bytes_to_hex(plaintext, 16, plaintext_hex); // Not needed anymore
 
     // Open files
     remove("test_vector.txt");
@@ -64,7 +64,7 @@ main(void)
 
         struct sosemanuk_context ctx;
         uint32_t keystream[20];  // 80 bytes
-        char iv_hex[33], keystream_hex[161], ciphertext_hex[33], recovered_hex[33];
+        char iv_hex[33], keystream_hex[161], ciphertext_hex[33];
         uint8_t ciphertext[16], recovered[16];
 
         // Setup context
@@ -88,7 +88,7 @@ main(void)
         bytes_to_hex(iv, 16, iv_hex);
         bytes_to_hex(keystream_bytes, 80, keystream_hex);
         bytes_to_hex(ciphertext, 16, ciphertext_hex);
-        bytes_to_hex(recovered, 16, recovered_hex);
+        // bytes_to_hex(recovered, 16, recovered_hex); // Not needed
 
         // Write to TXT
         if (fp_txt) {
@@ -96,9 +96,9 @@ main(void)
             fprintf(fp_txt, "Key: %s\n", key_hex);
             fprintf(fp_txt, "IV: %s\n", iv_hex);
             fprintf(fp_txt, "Keystream: %s\n", keystream_hex);
-            fprintf(fp_txt, "Plaintext: %s\n", plaintext_hex);
+            fprintf(fp_txt, "Plaintext: %.*s\n", 16, plaintext);
             fprintf(fp_txt, "Ciphertext: %s\n", ciphertext_hex);
-            fprintf(fp_txt, "Recovered Plaintext: %s\n\n", recovered_hex);
+            fprintf(fp_txt, "Recovered Plaintext: %.*s\n\n", 16, recovered);
         }
     }
 
