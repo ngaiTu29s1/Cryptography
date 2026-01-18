@@ -1,22 +1,3 @@
-/*
- * Simple Sosemanuk Encrypt/Decrypt Tool
- * Single case processing with key, iv, plaintext from input file
- * Usage:
- *   encrypt: ./simple_sosemanuk -e input.txt output.bin
- *   decrypt from hex: ./simple_sosemanuk -d input.txt
- *   decrypt from hex: ./simple_sosemanuk -h input.txt
- *
- * Input file format for encryption:
- *   key=<32_byte_hex_key>
- *   iv=<16_byte_hex_iv>
- *   plaintext=<text_or_hex_data>
- *
- * Input file format for decryption from hex:
- *   key=<32_byte_hex_key>
- *   iv=<16_byte_hex_iv>
- *   ciphertext=<hex_data>
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>

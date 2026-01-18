@@ -1,16 +1,3 @@
-/*
- * This program implements the stream cipher Sosemanuk
- * Author - C. Berbain, O. Billet, A. Canteaut, N. Courtois, H. Gilbert, L. Goubin,
- * A. Gouget, L. Granboulan, C. Lauradoux, M. Minier, T. Pornin and H. Sibert
- * The Sosemanuk home page - http://www.ecrypt.eu.org/stream/.
- * -----------------------
- * Developed: Rostislav Gashin (rost1993). The State University of Syktyvkar (Amplab).
- * Assistant project manager: Lipin Boris (dzruyk).
- * Project manager: Grisha Sitkarev.
- * -----------------------
- * Russia, Komi Republic, Syktyvkar - 14.02.2015, version 1.
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -46,10 +33,6 @@
 
 // Cyclic shift
 #define ROTL32(v, n)	((v << n) | (v >> (32 - n)))
-
-// Serpent S-boxes, implemented in bitslice mode.
-// These circuits have been published by Dag Arne Osvik ("Speeding up Serpent"). 
-// Published in the 3rd AES Candidate Conference.
 
 #define S0(r0, r1, r2, r3, r4) {	\
 	r3 ^= r0; r4  = r1;		\

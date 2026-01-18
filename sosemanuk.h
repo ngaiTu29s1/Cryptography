@@ -1,10 +1,3 @@
-/*
- * This library implements the stream cipher Sosemanuk
- * Author - C. Berbain, O. Billet, A. Canteaut, N. Courtois, H. Gilbert, L. Goubin,
- * A. Gouget, L. Granboulan, C. Lauradoux, M. Minier, T. Pornin and H. Sibert
- * Sosemanuk - the winner eSTREAM Project. Home page - http://www.ecrypt.eu.org/stream/
-*/
-
 #ifndef SOSEMANUK_H
 #define SOSEMANUK_H
 
